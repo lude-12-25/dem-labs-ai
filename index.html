@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demlabs AI Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the chat app */
+        body {
+            font-family: 'Inter', sans-serif; /* Using Inter font */
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .chat-container {
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            height: 80vh; /* Adjusted height for better viewing */
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background-color: #4f46e5; /* Indigo 600 */
+            color: white;
+            padding: 15px 20px;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            word-wrap: break-word;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        .message.user {
+            background-color: #a78bfa; /* Violet 400 */
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px; /* Tweak for speech bubble effect */
+        }
+
+        .message.bot {
+            background-color: #e0e7ff; /* Indigo 100 */
+            color: #374151; /* Gray 700 */
+            align-self: flex-start;
+            border-bottom-left-radius: 5px; /* Tweak for speech bubble effect */
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 15px 20px;
+            border-top: 1px solid #e5e7eb; /* Gray 200 */
+            background-color: #f9fafb; /* Gray 50 */
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+        }
+
+        .chat-input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #d1d5db; /* Gray 300 */
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: #4f46e5; /* Indigo 600 */
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+
+        .send-button {
+            background-color: #4f46e5; /* Indigo 600 */
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button:hover {
+            background-color: #4338ca; /* Indigo 700 */
+            transform: translateY(-1px);
+        }
+
+        .send-button:active {
+            transform: translateY(0);
+        }
+
+        .typing-indicator {
+            align-self: flex-start;
+            margin-top: 5px;
+            font-style: italic;
+            color: #6b7280; /* Gray 500 */
+            font-size: 0.9rem;
+            padding-left: 20px; /* Align with messages */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .chat-container {
+                height: 90vh;
+                border-radius: 0; /* Full width on smaller screens */
+                box-shadow: none;
+            }
+            body {
+                padding: 0;
+            }
+            .chat-header {
+                border-radius: 0;
+            }
+            .chat-input-area {
+                padding: 10px 15px;
+            }
+            .chat-input, .send-button {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            Demlabs AI Chat
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Messages will be appended here -->
+            <div class="message bot">Hello! How can I assist you today?</div>
+        </div>
+        <div class="typing-indicator hidden" id="typingIndicator">Demlabs AI is typing...</div>
+        <div class="chat-input-area">
+            <input type="text" id="messageInput" class="chat-input" placeholder="Type your message...">
+            <button id="sendMessageBtn" class="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageBtn = document.getElementById('sendMessageBtn');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        // Function to scroll chat to the bottom
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Function to add a message to the chat display
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Array to store chat history for context
+        let chatHistory = [];
+
+        // Function to get AI response using Gemini API
+        async function getAIResponse(userMessage) {
+            console.log("Attempting to get AI response for:", userMessage);
+            typingIndicator.classList.remove('hidden'); // Show typing indicator
+            sendMessageBtn.disabled = true; // Disable send button
+            messageInput.disabled = true; // Disable input field
+
+            // Add user message to chat history
+            chatHistory.push({ role: "user", parts: [{ text: userMessage }] });
+            console.log("Current chat history:", chatHistory);
+
+            const payload = { contents: chatHistory };
+            // The apiKey is provided by the Canvas environment at runtime.
+            // DO NOT modify this line or try to hardcode an API key here.
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                console.log("Sending API request to:", apiUrl);
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                console.log("API response received. Status:", response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("API response not OK:", response.status, response.statusText, errorText);
+                    addMessage(`Error from AI: ${response.statusText || 'Unknown error'}. Please try again.`, 'bot');
+                    return; // Exit function if response is not OK
+                }
+
+                const result = await response.json();
+                console.log("Parsed API response:", result);
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const botResponse = result.candidates[0].content.parts[0].text;
+                    addMessage(botResponse, 'bot');
+                    // Add bot response to chat history
+                    chatHistory.push({ role: "model", parts: [{ text: botResponse }] });
+                    console.log("Bot response added:", botResponse);
+                } else {
+                    addMessage("Oops! Demlabs AI couldn't generate a response. The response structure was unexpected.", 'bot');
+                    console.error("Unexpected API response structure:", result);
+                }
+            } catch (error) {
+                addMessage("An error occurred while connecting to Demlabs AI. Please check your internet connection or try again later.", 'bot');
+                console.error("API call failed:", error);
+            } finally {
+                typingIndicator.classList.add('hidden'); // Hide typing indicator
+                sendMessageBtn.disabled = false; // Re-enable send button
+                messageInput.disabled = false; // Re-enable input field
+                messageInput.focus(); // Focus back on input
+                console.log("API request process finished.");
+            }
+        }
+
+        // Event listener for send button click
+        sendMessageBtn.addEventListener('click', () => {
+            const messageText = messageInput.value.trim();
+            if (messageText) {
+                addMessage(messageText, 'user');
+                getAIResponse(messageText); // Get AI response from LLM
+                messageInput.value = ''; // Clear input field
+            }
+        });
+
+        // Event listener for Enter key press in the input field
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !sendMessageBtn.disabled) { // Prevent sending if disabled
+                sendMessageBtn.click(); // Trigger button click
+            }
+        });
+
+        // Initial scroll to bottom in case of pre-existing messages
+        window.onload = () => {
+            scrollToBottom();
+            console.log("Demlabs AI Chat App loaded.");
+        };
+    </script>
+</body>
+</html>
